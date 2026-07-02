@@ -1,0 +1,36 @@
+name: bridge reconcile
+
+# GitHub -> alerts: police this repo's issues against the governing documents.
+# Runs on issue activity and daily; dormant until BRIDGE_ENABLED is 'true'.
+# Uses only GITHUB_TOKEN (same-repo issue writes; the PMO repo is public).
+on:
+  issues:
+    types: [opened, reopened, edited]
+  schedule:
+    - cron: "37 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  reconcile:
+    if: vars.BRIDGE_ENABLED == 'true' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: c4g-john/refuge-for-humans-pmo
+          path: pmo
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - run: pip install "docassert==$(head -n1 pmo/.docassert-version)"
+      - name: Reconcile the board against the documents
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          docassert bridge reconcile \
+            --repo "$GITHUB_REPOSITORY" \
+            --documents-dir pmo/documents

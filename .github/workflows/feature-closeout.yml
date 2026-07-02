@@ -1,0 +1,43 @@
+name: feature closeout
+
+# When a story closes and it was the feature's last open sub-issue, close the
+# feature. GitHub shows sub-issue progress natively but never closes parents.
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  issues: write
+
+jobs:
+  closeout:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close the parent feature if all sub-issues are done
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          data=$(gh api graphql -f query='
+            query($owner:String!,$repo:String!,$num:Int!){
+              repository(owner:$owner,name:$repo){
+                issue(number:$num){
+                  parent { number state subIssues(first:100){ nodes { state } } }
+                }}}' -f owner="$OWNER" -f repo="$REPO" -F num="$NUMBER")
+          parent=$(echo "$data" | python3 -c "
+          import sys, json
+          p = json.load(sys.stdin)['data']['repository']['issue']['parent']
+          if not p or p['state'] != 'OPEN':
+              print(''); raise SystemExit
+          states = [n['state'] for n in p['subIssues']['nodes']]
+          print(p['number'] if states and all(s == 'CLOSED' for s in states) else '')")
+          if [ -n "$parent" ]; then
+            gh issue close "$parent" --repo "$OWNER/$REPO" \
+              --comment "All sub-issue stories are closed; closing this feature. (feature-closeout)"
+            echo "closed feature #$parent"
+          else
+            echo "parent still has open stories (or no parent)"
+          fi
