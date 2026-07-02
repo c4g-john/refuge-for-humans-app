@@ -1,0 +1,35 @@
+name: bridge scaffold
+
+# Documents -> issues, using only GITHUB_TOKEN: the governing documents are
+# public, and the issues live here. Runs daily and on dispatch; the pmo repo's
+# scaffold workflow (PROJECTS_TOKEN) adds merge-triggered immediacy + board ops.
+on:
+  schedule:
+    - cron: "7 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  scaffold:
+    if: vars.BRIDGE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: c4g-john/refuge-for-humans-pmo
+          path: pmo
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - run: pip install "docassert==$(head -n1 pmo/.docassert-version)"
+      - name: Scaffold Features and Stories from approved documents
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          docassert bridge scaffold \
+            --repo "$GITHUB_REPOSITORY" \
+            --documents-dir pmo/documents \
+            --docs-url https://github.com/c4g-john/refuge-for-humans-pmo/blob/main
