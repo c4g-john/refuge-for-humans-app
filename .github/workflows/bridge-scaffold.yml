@@ -28,8 +28,16 @@ jobs:
       - name: Scaffold Features and Stories from approved documents
         env:
           GH_TOKEN: ${{ github.token }}
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          PROJECT_NUMBER: ${{ vars.BRIDGE_PROJECT_NUMBER }}
         run: |
+          extra=""
+          if [ -n "$PROJECT_NUMBER" ] && [ -n "$PROJECTS_TOKEN" ]; then
+            extra="--project-number $PROJECT_NUMBER --init-board"
+          fi
+          # shellcheck disable=SC2086
           docassert bridge scaffold \
             --repo "$GITHUB_REPOSITORY" \
             --documents-dir pmo/documents \
-            --docs-url https://github.com/c4g-john/refuge-for-humans-pmo/blob/main
+            --docs-url https://github.com/c4g-john/refuge-for-humans-pmo/blob/main \
+            $extra
