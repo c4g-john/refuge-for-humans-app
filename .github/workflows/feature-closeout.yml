@@ -20,6 +20,7 @@ jobs:
           REPO: ${{ github.event.repository.name }}
           NUMBER: ${{ github.event.issue.number }}
         run: |
+          # shellcheck disable=SC2016  # $owner etc. are GraphQL variables, not shell
           set -euo pipefail
           data=$(gh api graphql -f query='
             query($owner:String!,$repo:String!,$num:Int!){
