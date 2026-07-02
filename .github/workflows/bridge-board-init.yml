@@ -1,0 +1,29 @@
+name: bridge board init
+
+# One-time: create the Projects v2 board (project-scoped token) and print its
+# number, which then goes into the BRIDGE_PROJECT_NUMBER repo variable.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: c4g-john/refuge-for-humans-pmo
+          path: pmo
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - run: pip install "docassert==$(head -n1 pmo/.docassert-version)"
+      - name: Create the board
+        env:
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          docassert bridge create-board --repo "$GITHUB_REPOSITORY" \
+            --documents-dir pmo/documents --title "Refuge for Humans"
