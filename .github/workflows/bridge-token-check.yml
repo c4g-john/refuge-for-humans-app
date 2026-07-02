@@ -31,3 +31,13 @@ jobs:
         run: |
           gh api graphql -f query="$QUERY" \
             && echo "projects-scope: OK" || echo "projects-scope: FAILED"
+      - name: Board contents read-back
+        env:
+          QUERY: |
+            query { user(login: "c4g-john") { projectV2(number: 2) {
+              title items(first: 3) { totalCount nodes {
+                fieldValues(first: 8) { nodes {
+                  ... on ProjectV2ItemFieldTextValue { text field { ... on ProjectV2FieldCommon { name } } }
+                  ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { name } } }
+                } } } } } } }
+        run: gh api graphql -f query="$QUERY" | python3 -m json.tool | head -40
