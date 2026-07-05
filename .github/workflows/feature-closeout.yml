@@ -1,45 +1,58 @@
-name: feature closeout
+name: feature close-out
 
-# When a story closes and it was the feature's last open sub-issue, close the
-# feature. GitHub shows sub-issue progress natively but never closes parents.
+# When a Story closes, close its parent Feature once every sibling is closed.
+#
+# Level-triggered: each run reconciles EVERY open parent, not just the event's
+# parent. Simultaneous close events share one concurrency slot and GitHub
+# keeps only one queued run (observed 2026-07-05: one squash-merge closed four
+# stories, two of the four runs were cancelled, and two features stayed open),
+# so any surviving run must be able to do the whole job. Passes repeat so a
+# closed feature can close its own parent in the same run.
 on:
   issues:
     types: [closed]
+  workflow_dispatch:
+
+concurrency:
+  group: feature-closeout
+  cancel-in-progress: false
 
 permissions:
   issues: write
 
 jobs:
   closeout:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Close the parent feature if all sub-issues are done
+      - name: Close every open parent whose sub-issues are all closed
         env:
           GH_TOKEN: ${{ github.token }}
-          OWNER: ${{ github.repository_owner }}
-          REPO: ${{ github.event.repository.name }}
-          NUMBER: ${{ github.event.issue.number }}
           QUERY: |
-            query($owner:String!,$repo:String!,$num:Int!){
-              repository(owner:$owner,name:$repo){
-                issue(number:$num){
-                  parent { number state subIssues(first:100){ nodes { state } } }
-                }}}
+            query($owner: String!, $repo: String!) {
+              repository(owner: $owner, name: $repo) {
+                issues(states: OPEN, first: 100) {
+                  nodes {
+                    number
+                    subIssues(first: 100) { totalCount nodes { state } }
+                  }
+                }
+              }
+            }
         run: |
-          set -euo pipefail
-          data=$(gh api graphql -f query="$QUERY" \
-                 -f owner="$OWNER" -f repo="$REPO" -F num="$NUMBER")
-          parent=$(echo "$data" | python3 -c "
-          import sys, json
-          p = json.load(sys.stdin)['data']['repository']['issue']['parent']
-          if not p or p['state'] != 'OPEN':
-              print(''); raise SystemExit
-          states = [n['state'] for n in p['subIssues']['nodes']]
-          print(p['number'] if states and all(s == 'CLOSED' for s in states) else '')")
-          if [ -n "$parent" ]; then
-            gh issue close "$parent" --repo "$OWNER/$REPO" \
-              --comment "All sub-issue stories are closed; closing this feature. (feature-closeout)"
-            echo "closed feature #$parent"
-          else
-            echo "parent still has open stories (or no parent)"
-          fi
+          for pass in 1 2 3; do
+            parents=$(gh api graphql -f query="$QUERY" \
+              -f owner="${GITHUB_REPOSITORY%/*}" -f repo="${GITHUB_REPOSITORY#*/}" \
+              -q '.data.repository.issues.nodes[]
+                  | select(.subIssues.totalCount > 0)
+                  | select([.subIssues.nodes[] | select(.state != "CLOSED")] | length == 0)
+                  | .number')
+            if [ -z "$parents" ]; then
+              echo "pass $pass: nothing left to close"
+              exit 0
+            fi
+            for number in $parents; do
+              gh issue close "$number" --repo "$GITHUB_REPOSITORY" \
+                --comment "All stories under this feature are closed; closing per the bridge."
+            done
+          done
