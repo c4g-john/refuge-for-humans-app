@@ -1,11 +1,11 @@
 name: bridge scaffold
 
 # Documents -> issues, using only GITHUB_TOKEN: the governing documents are
-# public, and the issues live here. Runs daily and on dispatch; the pmo repo's
+# public, and the issues live here. Runs on dispatch; the pmo repo's
 # scaffold workflow (PROJECTS_TOKEN) adds merge-triggered immediacy + board ops.
 on:
-  schedule:
-    - cron: "7 8 * * *"
+  repository_dispatch:
+    types: [bridge-scaffold]
   workflow_dispatch:
 
 permissions:

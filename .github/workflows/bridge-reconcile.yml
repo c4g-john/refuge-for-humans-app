@@ -1,13 +1,13 @@
 name: bridge reconcile
 
 # GitHub -> alerts: police this repo's issues against the governing documents.
-# Runs on issue activity and daily; dormant until BRIDGE_ENABLED is 'true'.
+# Runs on issue activity and dispatch; dormant until BRIDGE_ENABLED is 'true'.
 # Uses only GITHUB_TOKEN (same-repo issue writes; the PMO repo is public).
 on:
   issues:
     types: [opened, reopened, edited]
-  schedule:
-    - cron: "37 7 * * *"
+  repository_dispatch:
+    types: [bridge-reconcile]
   workflow_dispatch:
 
 permissions:
@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   reconcile:
-    if: vars.BRIDGE_ENABLED == 'true' && github.actor != 'github-actions[bot]'
+    if: vars.BRIDGE_ENABLED == 'true' && (github.event_name != 'issues' || github.actor != 'github-actions[bot]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
